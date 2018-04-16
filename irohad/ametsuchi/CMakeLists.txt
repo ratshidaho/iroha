@@ -19,6 +19,7 @@ target_link_libraries(ametsuchi
     pqxx
     libs_common
     command_execution
+    query_execution
     boost
     model_interfaces
     shared_model_proto_backend
