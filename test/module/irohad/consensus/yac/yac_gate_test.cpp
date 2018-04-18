@@ -30,7 +30,6 @@
 #include "module/irohad/consensus/yac/yac_mocks.hpp"
 #include "module/irohad/network/network_mocks.hpp"
 #include "module/irohad/simulator/simulator_mocks.hpp"
-#include "cryptography/hash.hpp"
 
 using namespace iroha::consensus::yac;
 using namespace iroha::network;
@@ -61,8 +60,7 @@ class YacGateTest : public ::testing::Test {
             .signAndAddSignature(keypair);
 
     expected_block = clone(tmp);
-    const auto &wrapped_sig = *(expected_block->signatures().begin());
-    const auto &signature = *wrapped_sig;
+    const auto &signature = *(expected_block->signatures().begin());
     // TODO: 24/04/2018 x3medima17 remove makeOldModel in next PR
     const auto old_signature =
         *std::unique_ptr<iroha::model::Signature>(signature.makeOldModel());
@@ -133,9 +131,8 @@ TEST_F(YacGateTest, YacGateSubscriptionTest) {
 
   // verify that yac gate emit expected block
   auto gate_wrapper = make_test_subscriber<CallExact>(gate->on_commit(), 1);
-  gate_wrapper.subscribe([this](auto block) {
-    ASSERT_EQ(*block, *expected_block);
-  });
+  gate_wrapper.subscribe(
+      [this](auto block) { ASSERT_EQ(*block, *expected_block); });
 
   ASSERT_TRUE(gate_wrapper.validate());
 }
@@ -195,7 +192,7 @@ TEST_F(YacGateTest, LoadBlockWhenDifferentCommit) {
 
   // load block
   auto sig = expected_block->signatures().begin();
-  auto &pubkey = (*sig)->publicKey();
+  auto &pubkey = sig->publicKey();
   EXPECT_CALL(*block_loader, retrieveBlock(pubkey, expected_block->hash()))
       .WillOnce(Return(expected_block));
 
