@@ -164,10 +164,11 @@ namespace torii {
     auto subscription = rxcpp::composite_subscription();
     auto request_hash = shared_model::crypto::Hash(request.tx_hash());
 
-    /// condition variable to ensure that current method will not return before
+    /// Condition variable to ensure that current method will not return before
     /// transaction is processed or a timeout reached. It blocks current thread
     /// and waits for thread from subscribe() to unblock.
-//    std::condition_variable cv;
+    std::shared_ptr<std::condition_variable> cv =
+            std::make_shared<std::condition_variable>();
 
     tx_processor_->transactionNotifier()
         .filter([&request_hash](auto response) {
@@ -187,7 +188,7 @@ namespace torii {
                 response_writer.WriteLast(resp_sub, grpc::WriteOptions());
                 //subscription.unsubscribe();
                 finished = true;
-                cv_.notify_one();
+                cv->notify_one();
               } else {
                 response_writer.Write(resp_sub);
               }
@@ -198,7 +199,7 @@ namespace torii {
     /// we expect that start_tx_processing_duration_ will be enough
     /// to at least start tx processing.
     /// Otherwise we think there is no such tx at all.
-    cv_.wait_for(lock, start_tx_processing_duration_);
+    cv->wait_for(lock, start_tx_processing_duration_);
     if (not finished) {
       if (not resp) {
         // TODO 05/03/2018 andrei IR-1046 Server-side shared model object
@@ -214,7 +215,7 @@ namespace torii {
             "Tx processing was started but unfinished, awaiting more, hash: {}",
             request_hash.hex());
         /// We give it 2*proposal_delay time until timeout.
-        cv_.wait_for(lock, 2 * proposal_delay_);
+        cv->wait_for(lock, 2 * proposal_delay_);
       }
     } else {
       log_->warn("Command processing timeout, hash: {}", request_hash.hex());

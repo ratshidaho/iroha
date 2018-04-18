@@ -143,7 +143,6 @@ namespace torii {
     std::chrono::milliseconds start_tx_processing_duration_;
     std::shared_ptr<CacheType> cache_;
     logger::Logger log_;
-    std::condition_variable cv_;
   };
 
 }  // namespace torii
