@@ -59,7 +59,7 @@ namespace iroha {
         }
       }
 
-      boost::optional<ValueType> findItemImpl(const KeyType &key) const {
+      boost::optional<ValueType> findItemImpl(const KeyType &key) {
         auto found = handler_map_.find(key);
         if (found == handler_map_.end()) {
           return boost::none;

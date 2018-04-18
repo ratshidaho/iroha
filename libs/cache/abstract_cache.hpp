@@ -78,8 +78,9 @@ namespace iroha {
        * @param hash - key to find
        * @return Optional of ValueType
        */
-      boost::optional<ValueType> findItem(const KeyType &key) const {
-        return constUnderlying().findItemImpl(key);
+      boost::optional<ValueType> findItem(const KeyType &key) {
+        std::lock_guard<std::mutex> lock(add_item_mutex_);
+        return underlying().findItemImpl(key);
       }
 
      private:

@@ -160,14 +160,14 @@ namespace torii {
     auto resp = cache_->findItem(shared_model::crypto::Hash(request.tx_hash()));
     checkCacheAndSend(resp, response_writer);
 
-    bool finished = false;
+    std::atomic<bool> finished(false);
     auto subscription = rxcpp::composite_subscription();
     auto request_hash = shared_model::crypto::Hash(request.tx_hash());
 
     /// condition variable to ensure that current method will not return before
     /// transaction is processed or a timeout reached. It blocks current thread
     /// and waits for thread from subscribe() to unblock.
-    std::condition_variable cv;
+//    std::condition_variable cv;
 
     tx_processor_->transactionNotifier()
         .filter([&request_hash](auto response) {
@@ -185,9 +185,9 @@ namespace torii {
 
               if (isFinalStatus(resp_sub.tx_status())) {
                 response_writer.WriteLast(resp_sub, grpc::WriteOptions());
-                subscription.unsubscribe();
+                //subscription.unsubscribe();
                 finished = true;
-                cv.notify_one();
+                cv_.notify_one();
               } else {
                 response_writer.Write(resp_sub);
               }
@@ -198,10 +198,9 @@ namespace torii {
     /// we expect that start_tx_processing_duration_ will be enough
     /// to at least start tx processing.
     /// Otherwise we think there is no such tx at all.
-    cv.wait_for(lock, start_tx_processing_duration_);
+    cv_.wait_for(lock, start_tx_processing_duration_);
     if (not finished) {
       if (not resp) {
-        subscription.unsubscribe();
         // TODO 05/03/2018 andrei IR-1046 Server-side shared model object
         // factories with move semantics
         auto resp_none = shared_model::proto::TransactionStatusBuilder()
@@ -215,11 +214,12 @@ namespace torii {
             "Tx processing was started but unfinished, awaiting more, hash: {}",
             request_hash.hex());
         /// We give it 2*proposal_delay time until timeout.
-        cv.wait_for(lock, 2 * proposal_delay_);
+        cv_.wait_for(lock, 2 * proposal_delay_);
       }
     } else {
       log_->warn("Command processing timeout, hash: {}", request_hash.hex());
     }
+    subscription.unsubscribe();
   }
 
   grpc::Status CommandService::StatusStream(
