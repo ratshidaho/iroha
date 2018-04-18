@@ -159,20 +159,19 @@ namespace torii {
       grpc::ServerWriter<iroha::protocol::ToriiResponse> &response_writer) {
     auto resp = cache_->findItem(shared_model::crypto::Hash(request.tx_hash()));
     checkCacheAndSend(resp, response_writer);
-
-    std::atomic<bool> finished(false);
+    auto finished = std::make_shared<std::atomic<bool>>(false);
     auto subscription = rxcpp::composite_subscription();
-    auto request_hash = shared_model::crypto::Hash(request.tx_hash());
+    auto request_hash =
+        std::make_shared<shared_model::crypto::Hash>(request.tx_hash());
 
     /// Condition variable to ensure that current method will not return before
     /// transaction is processed or a timeout reached. It blocks current thread
     /// and waits for thread from subscribe() to unblock.
-    std::shared_ptr<std::condition_variable> cv =
-            std::make_shared<std::condition_variable>();
+    auto cv = std::make_shared<std::condition_variable>();
 
     tx_processor_->transactionNotifier()
         .filter([&request_hash](auto response) {
-          return response->transactionHash() == request_hash;
+          return response->transactionHash() == *request_hash;
         })
         .subscribe(
             subscription,
@@ -186,8 +185,8 @@ namespace torii {
 
               if (isFinalStatus(resp_sub.tx_status())) {
                 response_writer.WriteLast(resp_sub, grpc::WriteOptions());
-                //subscription.unsubscribe();
-                finished = true;
+                // subscription.unsubscribe();
+                *finished = true;
                 cv->notify_one();
               } else {
                 response_writer.Write(resp_sub);
@@ -200,12 +199,14 @@ namespace torii {
     /// to at least start tx processing.
     /// Otherwise we think there is no such tx at all.
     cv->wait_for(lock, start_tx_processing_duration_);
-    if (not finished) {
+    if (not *finished) {
       if (not resp) {
+        log_->warn("StatusStream request processing timeout, hash: {}",
+                   request_hash->hex());
         // TODO 05/03/2018 andrei IR-1046 Server-side shared model object
         // factories with move semantics
         auto resp_none = shared_model::proto::TransactionStatusBuilder()
-                             .txHash(request_hash)
+                             .txHash(*request_hash)
                              .notReceived()
                              .build();
         response_writer.WriteLast(resp_none.getTransport(),
@@ -213,12 +214,13 @@ namespace torii {
       } else {
         log_->info(
             "Tx processing was started but unfinished, awaiting more, hash: {}",
-            request_hash.hex());
+            request_hash->hex());
         /// We give it 2*proposal_delay time until timeout.
         cv->wait_for(lock, 2 * proposal_delay_);
       }
     } else {
-      log_->warn("Command processing timeout, hash: {}", request_hash.hex());
+      log_->info("StatusStream request processed successfully, hash: {}",
+                 request_hash->hex());
     }
     subscription.unsubscribe();
   }
