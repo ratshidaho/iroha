@@ -36,6 +36,7 @@ namespace iroha {
         for (const auto &tx : model_proposal->transactions()) {
           auto hash = tx->hash();
           proposal_set_.insert(hash);
+          std::lock_guard<std::mutex> lock(notifier_mutex_);
           notifier_.get_subscriber().on_next(
               status_builder_.statelessValidationSuccess()
                   .txHash(hash)
@@ -53,6 +54,7 @@ namespace iroha {
                 if (this->proposal_set_.find(hash) != proposal_set_.end()) {
                   proposal_set_.erase(hash);
                   candidate_set_.insert(hash);
+                  std::lock_guard<std::mutex> lock(notifier_mutex_);
                   notifier_.get_subscriber().on_next(
                       status_builder_.statefulValidationSuccess()
                           .txHash(hash)
@@ -63,6 +65,7 @@ namespace iroha {
             // on complete
             [this]() {
               for (auto& tx_hash : proposal_set_) {
+                std::lock_guard<std::mutex> lock(notifier_mutex_);
                 notifier_.get_subscriber().on_next(
                     status_builder_.statefulValidationFailed()
                         .txHash(tx_hash)
@@ -71,6 +74,7 @@ namespace iroha {
               proposal_set_.clear();
 
               for (auto tx_hash : candidate_set_) {
+                std::lock_guard<std::mutex> lock(notifier_mutex_);
                 notifier_.get_subscriber().on_next(
                     status_builder_.committed().txHash(tx_hash).build());
               }

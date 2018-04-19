@@ -71,6 +71,7 @@ namespace torii {
     while (reader->Read(&resp)) {
       response.push_back(resp);
     }
+    reader->Finish();
   }
 
   void CommandSyncClient::swap(CommandSyncClient &lhs, CommandSyncClient &rhs) {
