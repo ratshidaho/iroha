@@ -198,10 +198,18 @@ namespace torii {
 
     std::mutex wait_subscription;
     std::unique_lock<std::mutex> lock(wait_subscription);
+
+    log_->info("StatusStream waiting start, hash: {}",
+               request_hash->hex());
+
     /// we expect that start_tx_processing_duration_ will be enough
     /// to at least start tx processing.
     /// Otherwise we think there is no such tx at all.
     cv->wait_for(lock, start_tx_processing_duration_);
+
+    log_->info("StatusStream waiting finish, hash: {}",
+               request_hash->hex());
+
     if (not *finished) {
       if (not resp) {
         log_->warn("StatusStream request processing timeout, hash: {}",
@@ -226,6 +234,7 @@ namespace torii {
                  request_hash->hex());
     }
     subscription.unsubscribe();
+    log_->info("StatusStream unsubscribed");
   }
 
   grpc::Status CommandService::StatusStream(
