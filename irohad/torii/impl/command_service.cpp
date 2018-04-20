@@ -158,7 +158,9 @@ namespace torii {
       iroha::protocol::TxStatusRequest const &request,
       grpc::ServerWriter<iroha::protocol::ToriiResponse> &response_writer) {
     auto resp = cache_->findItem(shared_model::crypto::Hash(request.tx_hash()));
-    checkCacheAndSend(resp, response_writer);
+    if (checkCacheAndSend(resp, response_writer)) {
+      return;
+    }
     auto finished = std::make_shared<std::atomic<bool>>(false);
     auto subscription = rxcpp::composite_subscription();
     auto request_hash =
@@ -168,6 +170,9 @@ namespace torii {
     /// transaction is processed or a timeout reached. It blocks current thread
     /// and waits for thread from subscribe() to unblock.
     auto cv = std::make_shared<std::condition_variable>();
+
+    log_->info("StatusStream before subscribe(), hash: {}",
+               request_hash->hex());
 
     tx_processor_->transactionNotifier()
         .filter([&request_hash](auto response) {
@@ -181,14 +186,14 @@ namespace torii {
                   shared_model::proto::TransactionResponse>(iroha_response);
 
               log_->info("subscribe new status: {}, hash {}",
-                         proto_response->toString(), proto_response->transactionHash().hex());
+                         proto_response->toString(),
+                         proto_response->transactionHash().hex());
 
               iroha::protocol::ToriiResponse resp_sub =
                   proto_response->getTransport();
 
               if (isFinalStatus(resp_sub.tx_status())) {
                 response_writer.WriteLast(resp_sub, grpc::WriteOptions());
-                // subscription.unsubscribe();
                 *finished = true;
                 cv->notify_one();
               } else {
@@ -199,18 +204,16 @@ namespace torii {
     std::mutex wait_subscription;
     std::unique_lock<std::mutex> lock(wait_subscription);
 
-    log_->info("StatusStream waiting start, hash: {}",
-               request_hash->hex());
+    log_->info("StatusStream waiting start, hash: {}", request_hash->hex());
 
     /// we expect that start_tx_processing_duration_ will be enough
     /// to at least start tx processing.
     /// Otherwise we think there is no such tx at all.
     cv->wait_for(lock, start_tx_processing_duration_);
 
-    log_->info("StatusStream waiting finish, hash: {}",
-               request_hash->hex());
+    log_->info("StatusStream waiting finish, hash: {}", request_hash->hex());
 
-    if (not *finished) {
+    if (not*finished) {
       if (not resp) {
         log_->warn("StatusStream request processing timeout, hash: {}",
                    request_hash->hex());
@@ -228,6 +231,20 @@ namespace torii {
             request_hash->hex());
         /// We give it 2*proposal_delay time until timeout.
         cv->wait_for(lock, 2 * proposal_delay_);
+
+        /// status can be in the cache if it was finalized before we subscribed
+        if (not finished) {
+          auto cache_second_check =
+              cache_->findItem(shared_model::crypto::Hash(request.tx_hash()));
+          auto second_hash =
+              std::make_shared<shared_model::crypto::Hash>(request.tx_hash());
+          /// final status means the case from a comment above
+          /// if it's not - let's ignore it for now
+          if (isFinalStatus(cache_second_check->tx_status())) {
+            log_->warn("Transaction was finalized before subscribtion");
+            response_writer.WriteLast(*resp, grpc::WriteOptions());
+          }
+        }
       }
     } else {
       log_->info("StatusStream request processed successfully, hash: {}",
@@ -245,19 +262,22 @@ namespace torii {
     return grpc::Status::OK;
   }
 
-  void CommandService::checkCacheAndSend(
+  bool CommandService::checkCacheAndSend(
       const boost::optional<iroha::protocol::ToriiResponse> &resp,
       grpc::ServerWriter<iroha::protocol::ToriiResponse> &response_writer)
       const {
     if (resp) {
       if (isFinalStatus(resp->tx_status())) {
+        log_->info("Transaction in service cache and final");
         response_writer.WriteLast(*resp, grpc::WriteOptions());
-        return;
+        return true;
       }
+      log_->info("Transaction in service cache and not final");
       response_writer.Write(*resp);
     } else {
-      log_->debug("Transaction miss service cache");
+      log_->info("Transaction miss service cache");
     }
+    return false;
   }
 
   bool CommandService::isFinalStatus(

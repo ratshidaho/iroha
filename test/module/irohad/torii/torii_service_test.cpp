@@ -392,7 +392,7 @@ TEST_F(ToriiServiceTest, StreamingFullPipelineTest) {
   block_notifier_.get_subscriber().on_completed();
   t.join();
 
-  ASSERT_GE(torii_response.size(), 3);
+  ASSERT_GE(torii_response.size(), 2);
   ASSERT_EQ(torii_response.back().tx_status(),
             iroha::protocol::TxStatus::COMMITTED);
 }
