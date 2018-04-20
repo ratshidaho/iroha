@@ -39,7 +39,8 @@ namespace iroha {
           log_->info("on proposal stateless success: {}", hash.hex());
           std::lock_guard<std::mutex> lock(notifier_mutex_);
           notifier_.get_subscriber().on_next(
-              status_builder_.statelessValidationSuccess()
+              shared_model::builder::DefaultTransactionStatusBuilder()
+                  .statelessValidationSuccess()
                   .txHash(hash)
                   .build());
         }
@@ -58,7 +59,8 @@ namespace iroha {
                   log_->info("on commit stateful success: {}", hash.hex());
                   std::lock_guard<std::mutex> lock(notifier_mutex_);
                   notifier_.get_subscriber().on_next(
-                      status_builder_.statefulValidationSuccess()
+                      shared_model::builder::DefaultTransactionStatusBuilder()
+                          .statefulValidationSuccess()
                           .txHash(hash)
                           .build());
                 }
@@ -66,11 +68,12 @@ namespace iroha {
             },
             // on complete
             [this]() {
-              for (auto& tx_hash : proposal_set_) {
+              for (auto &tx_hash : proposal_set_) {
                 log_->info("on commit stateful failed: {}", tx_hash.hex());
                 std::lock_guard<std::mutex> lock(notifier_mutex_);
                 notifier_.get_subscriber().on_next(
-                    status_builder_.statefulValidationFailed()
+                    shared_model::builder::DefaultTransactionStatusBuilder()
+                        .statefulValidationFailed()
                         .txHash(tx_hash)
                         .build());
               }
@@ -80,7 +83,10 @@ namespace iroha {
                 log_->info("on commit committed: {}", tx_hash.hex());
                 std::lock_guard<std::mutex> lock(notifier_mutex_);
                 notifier_.get_subscriber().on_next(
-                    status_builder_.committed().txHash(tx_hash).build());
+                    shared_model::builder::DefaultTransactionStatusBuilder()
+                        .committed()
+                        .txHash(tx_hash)
+                        .build());
               }
               candidate_set_.clear();
             });

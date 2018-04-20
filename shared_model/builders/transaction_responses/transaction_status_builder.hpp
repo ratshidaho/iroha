@@ -19,6 +19,7 @@
 #define IROHA_TRANSACTION_STATUS_BUILDER_HPP
 
 #include "interfaces/common_objects/account_asset.hpp"
+#include "logger/logger.hpp"
 
 namespace shared_model {
   namespace builder {
@@ -33,47 +34,59 @@ namespace shared_model {
     template <typename BuilderImpl>
     class TransactionStatusBuilder {
      public:
+      TransactionStatusBuilder() {
+        log_ = logger::log("TransactionStatusBuilder");
+      }
+
       std::shared_ptr<shared_model::interface::TransactionResponse> build() {
+        log_->info("build status");
         return clone(builder_.build());
       }
 
       TransactionStatusBuilder statelessValidationSuccess() {
+        log_->info("stateless success status");
         TransactionStatusBuilder copy(*this);
         copy.builder_ = this->builder_.statelessValidationSuccess();
         return copy;
       }
 
       TransactionStatusBuilder statelessValidationFailed() {
+        log_->info("stateless failed status");
         TransactionStatusBuilder copy(*this);
         copy.builder_ = this->builder_.statelessValidationFailed();
         return copy;
       }
 
       TransactionStatusBuilder statefulValidationSuccess() {
+        log_->info("stateful success status");
         TransactionStatusBuilder copy(*this);
         copy.builder_ = this->builder_.statefulValidationSuccess();
         return copy;
       }
 
       TransactionStatusBuilder statefulValidationFailed() {
+        log_->info("stateful failed status");
         TransactionStatusBuilder copy(*this);
         copy.builder_ = this->builder_.statefulValidationFailed();
         return copy;
       }
 
       TransactionStatusBuilder committed() {
+        log_->info("committed status");
         TransactionStatusBuilder copy(*this);
         copy.builder_ = this->builder_.committed();
         return copy;
       }
 
       TransactionStatusBuilder notReceived() {
+        log_->info("not received status");
         TransactionStatusBuilder copy(*this);
         copy.builder_ = this->builder_.notReceived();
         return copy;
       }
 
       TransactionStatusBuilder txHash(const crypto::Hash &hash) {
+        log_->info("status hash: {}", hash.hex());
         TransactionStatusBuilder copy(*this);
         copy.builder_ = this->builder_.txHash(hash);
         return copy;
@@ -81,6 +94,7 @@ namespace shared_model {
 
      private:
       BuilderImpl builder_;
+      logger::Logger log_;
     };
 
   }  // namespace builder

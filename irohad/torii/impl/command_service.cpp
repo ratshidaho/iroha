@@ -180,6 +180,9 @@ namespace torii {
               auto proto_response = std::static_pointer_cast<
                   shared_model::proto::TransactionResponse>(iroha_response);
 
+              log_->info("subscribe new status: {}, hash {}",
+                         proto_response->toString(), proto_response->transactionHash().hex());
+
               iroha::protocol::ToriiResponse resp_sub =
                   proto_response->getTransport();
 
