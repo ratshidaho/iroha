@@ -14,7 +14,7 @@ def doReleaseBuild() {
   }
   def platform = sh(script: 'uname -m', returnStdout: true).trim()
   sh "mkdir /tmp/${env.GIT_COMMIT}-${BUILD_NUMBER} || true"
-  iC = docker.image("hyperledger/iroha:${platform}-develop")
+  iC = docker.image("hyperledger/iroha:${platform}-develop-build")
   iC.pull()
   iC.inside(""
     + " -v /tmp/${GIT_COMMIT}-${BUILD_NUMBER}:/tmp/${GIT_COMMIT}"
@@ -56,10 +56,10 @@ def doReleaseBuild() {
   iCRelease = docker.build("hyperledger/iroha:${GIT_COMMIT}-${BUILD_NUMBER}-release", "--no-cache -f /tmp/${env.GIT_COMMIT}/Dockerfile /tmp/${env.GIT_COMMIT}")
   docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
     if (env.BRANCH_NAME == 'develop') {
-      iCRelease.push("${platform}-develop-latest")
+      iCRelease.push("${platform}-develop")
     }
     else if (env.BRANCH_NAME == 'master') {
-      iCRelease.push("${platform}-latest")
+      iCRelease.push("${platform}")
     }
   }
   sh "docker rmi ${iCRelease.id}"

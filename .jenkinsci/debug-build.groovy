@@ -21,7 +21,7 @@ def doDebugBuild(coverageEnabled=false) {
     + " -e POSTGRES_PASSWORD=${env.IROHA_POSTGRES_PASSWORD}"
     + " --name ${env.IROHA_POSTGRES_HOST}"
     + " --network=${env.IROHA_NETWORK}")
-  def iC = dPullOrBuild.dockerPullOrUpdate("${platform}-develop",
+  def iC = dPullOrBuild.dockerPullOrUpdate("${platform}-develop-build",
                                            "https://raw.githubusercontent.com/hyperledger/iroha/${env.GIT_COMMIT}/docker/develop/${platform}/Dockerfile",
                                            "https://raw.githubusercontent.com/hyperledger/iroha/${env.GIT_PREVIOUS_COMMIT}/docker/develop/${platform}/Dockerfile",
                                            "https://raw.githubusercontent.com/hyperledger/iroha/develop/docker/develop/${platform}/Dockerfile",
